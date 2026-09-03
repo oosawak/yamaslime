@@ -99,7 +99,6 @@
       const shape = [[0,0]];
       active={shape,x:Math.floor(COLS/2),y:ROWS-1-Math.max(...shape.map(p=>p.y)),rot:0,color:slimeColors[Math.floor(Math.random()*slimeColors.length)],size:.72+Math.random()*.72};
       activeGroup = new THREE.Group(); scene.add(activeGroup); drawActive();
-      if(!valid(active.x,active.y,active.shape)) endGame();
     }
     function rotated(shape, turns) { let out=shape.map(p=>({...p})); for(let n=0;n<turns;n++) out=out.map(({x,y})=>({x:-y,y:x})); return out; }
     function valid(px,py,shape) { return shape.every(p=>{const x=px+p.x,y=py+p.y; return x>=0&&x<COLS&&y>=0&&y<ROWS&&!board[y][x];}); }
@@ -122,7 +121,7 @@
     function hardDrop() { if(gameOver||paused)return; while(move(0,-1)){} lock(false); score+=5; updateStats(); }
     function keydown(e) { if(e.code==='ArrowLeft'){e.preventDefault();move(-1,0)} else if(e.code==='ArrowRight'){e.preventDefault();move(1,0)} else if(e.code==='ArrowDown'){e.preventDefault();if(!move(0,-1))lock(false)} else if(e.code==='ArrowUp'){e.preventDefault();rotate()} else if(e.code==='Space'){e.preventDefault();hardDrop()} else if(e.code==='KeyP')togglePause(); else if(e.code==='KeyR')reset(); }
     function togglePause(){if(gameOver)return;paused=!paused;$('pause').textContent=paused?'再開':'一時停止';if(paused)showMessage('PAUSED','再開ボタンまたは P キー');else hideMessage();}
-    function endGame(){gameOver=true;showMessage('GAME OVER','リスタートしてください');}
+    function endGame(){}
     function showMessage(title,sub){$('messageText').firstChild.textContent=title;$('messageText').querySelector('small').textContent=sub;$('message').classList.add('on');}
     function hideMessage(){$('message').classList.remove('on');}
     function updateStats(){$('score').textContent=score.toLocaleString();$('lines').textContent=lines;$('level').textContent=level;}
