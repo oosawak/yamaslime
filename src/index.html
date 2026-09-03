@@ -125,7 +125,7 @@
     function showMessage(title,sub){$('messageText').firstChild.textContent=title;$('messageText').querySelector('small').textContent=sub;$('message').classList.add('on');}
     function hideMessage(){$('message').classList.remove('on');}
     function updateStats(){$('score').textContent=score.toLocaleString();$('lines').textContent=lines;$('level').textContent=level;}
-    function frame(now){const dt=Math.min((now-(lastTime||now))/1000,.1);lastTime=now;if(!paused&&!gameOver){ if(!active) spawn(); physicsClock+=dt; if(physicsClock>.016){physicsClock=0; updateSand(.016);} if(active){fallClock+=dt;const speed=Math.max(.12,.75-level*.055);if(fallClock>speed){fallClock=0;if(!move(0,-1))lock(false);}}}renderer.render(scene,camera);requestAnimationFrame(frame);}
+    function frame(now){const dt=Math.min((now-(lastTime||now))/1000,.1);lastTime=now;if(!paused&&!gameOver){ if(!active) spawn(); physicsClock+=dt; if(physicsClock>.016){physicsClock=0; updateSand(.016);} if(active){fallClock+=dt;const speed=.4;if(fallClock>=speed){fallClock=0;if(!move(0,-1))lock(false);}}}renderer.render(scene,camera);requestAnimationFrame(frame);}
   </script>
 </body>
 </html>
