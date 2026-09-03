@@ -1,4 +1,4 @@
-# 山テトリス / Yama Slime
+# 山スライム / Yama Slime
 
 Three.js + Tauri で作った、スライムを積み上げるテトリス風ゲームです。
 
