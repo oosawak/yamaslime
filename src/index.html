@@ -60,7 +60,7 @@
     ];
     const slimeColors = [0x75e68b,0x80d9ee,0xc78cff,0xffd66e,0xff8aa0,0x9eea73,0xffa56d];
     let scene, camera, renderer, raycaster, pointer, active, activeGroup, lastTime;
-    let fallClock = 0, score = 0, lines = 0, level = 1, paused = false, gameOver = false;
+    let fallClock = 0, physicsClock = 0, score = 0, lines = 0, level = 1, paused = false, gameOver = false;
     const boardGroup = new THREE.Group();
     const mats = new Map();
     const $ = id => document.getElementById(id);
@@ -125,7 +125,7 @@
     function showMessage(title,sub){$('messageText').firstChild.textContent=title;$('messageText').querySelector('small').textContent=sub;$('message').classList.add('on');}
     function hideMessage(){$('message').classList.remove('on');}
     function updateStats(){$('score').textContent=score.toLocaleString();$('lines').textContent=lines;$('level').textContent=level;}
-    function frame(now){const dt=Math.min((now-(lastTime||now))/1000,.1);lastTime=now;if(!paused&&!gameOver&&active){fallClock+=dt;const speed=Math.max(.12,.75-level*.055);if(fallClock>speed){fallClock=0;if(!move(0,-1))lock(false);}}renderer.render(scene,camera);requestAnimationFrame(frame);}
+    function frame(now){const dt=Math.min((now-(lastTime||now))/1000,.1);lastTime=now;if(!paused&&!gameOver){ physicsClock+=dt; if(physicsClock>.09){physicsClock=0; if(settleSand()) clearLines();} if(active){fallClock+=dt;const speed=Math.max(.12,.75-level*.055);if(fallClock>speed){fallClock=0;if(!move(0,-1))lock(false);}}}renderer.render(scene,camera);requestAnimationFrame(frame);}
   </script>
 </body>
 </html>
