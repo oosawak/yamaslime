@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Yama Slime",
+  "version": "0.1.0",
+  "identifier": "com.yamaslime.game",
+  "build": {
+    "beforeDevCommand": "python3 -m http.server 4174 --bind 127.0.0.1 --directory ../src",
+    "devUrl": "http://127.0.0.1:4174",
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{ "title": "山テトリス - Yama Slime", "width": 900, "height": 800, "resizable": true }],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": true, "targets": "all" }
+}

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>山テトリス - Yama Slime</title>
+  <style>
+    :root { color-scheme: dark; --ink:#eef8e8; --muted:#a9c5a5; --panel:rgba(11,30,25,.82); --line:rgba(197,236,173,.2); }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#071b20; color:var(--ink); font-family:system-ui,-apple-system,sans-serif; }
+    #game { position:relative; width:100%; height:100%; background:radial-gradient(circle at 50% 20%,#255b50 0,#102f35 42%,#07151f 100%); }
+    #game > canvas { display:block; width:100%!important; height:100%!important; touch-action:none; }
+    #hud { position:absolute; inset:0; pointer-events:none; user-select:none; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 12px 35px #0004; backdrop-filter:blur(8px); }
+    #title { position:absolute; top:18px; left:22px; padding:13px 17px; }
+    #title h1 { margin:0; font-size:clamp(20px,3vw,32px); letter-spacing:.08em; color:#d8f6b6; text-shadow:0 3px 18px #7be06a55; }
+    #title p { margin:2px 0 0; color:var(--muted); font-size:11px; letter-spacing:.18em; }
+    #stats { position:absolute; top:18px; right:22px; min-width:145px; padding:12px 15px; }
+    .stat { display:flex; justify-content:space-between; gap:25px; font-size:12px; color:var(--muted); }
+    .stat b { color:var(--ink); font-variant-numeric:tabular-nums; }
+    #hint { position:absolute; left:22px; bottom:20px; padding:10px 13px; color:var(--muted); font-size:11px; line-height:1.8; }
+    kbd { padding:2px 6px; border:1px solid #b7df9e55; border-bottom-width:2px; border-radius:5px; color:#e4f7c9; }
+    #controls { position:absolute; right:22px; bottom:20px; display:flex; gap:7px; pointer-events:auto; }
+    button { border:1px solid #c4edaa44; border-radius:9px; padding:9px 12px; color:#e9f9d8; background:#193c35cc; font:inherit; cursor:pointer; }
+    button:hover,button:focus-visible { background:#2b6250; outline:2px solid #b9ef91; }
+    #message { position:absolute; inset:0; display:grid; place-items:center; opacity:0; transition:opacity .2s; pointer-events:none; }
+    #message.on { opacity:1; }
+    #message span { padding:16px 22px; border-radius:14px; background:#081d1bd9; border:1px solid #bdf19a55; font-size:clamp(24px,5vw,54px); font-weight:800; letter-spacing:.1em; text-align:center; }
+    #message small { display:block; margin-top:5px; color:var(--muted); font-size:12px; letter-spacing:.1em; }
+    @media (max-width:650px) { #title{top:10px;left:10px} #stats{top:10px;right:10px} #hint{left:10px;bottom:10px} #controls{right:10px;bottom:10px} #hint{display:none} }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="hud">
+      <div id="title" class="panel"><h1>山テトリス</h1><p>YAMA SLIME</p></div>
+      <div id="stats" class="panel">
+        <div class="stat"><span>SCORE</span><b id="score">0</b></div>
+        <div class="stat"><span>LINES</span><b id="lines">0</b></div>
+        <div class="stat"><span>LEVEL</span><b id="level">1</b></div>
+      </div>
+      <div id="hint" class="panel">クリック：スライムを砂にする<br><kbd>←</kbd><kbd>→</kbd> 移動　<kbd>↑</kbd> 回転　<kbd>↓</kbd> 落下　<kbd>Space</kbd> 一気に落とす</div>
+      <div id="controls"><button id="pause">一時停止</button><button id="restart">リスタート</button></div>
+      <div id="message"><span id="messageText">GAME OVER<small>リスタートしてください</small></span></div>
+    </div>
+  </div>
+  <script type="module">
+    import * as THREE from './js/three.module.js';
+
+    const COLS = 10, ROWS = 20, CELL = 1.06;
+    const board = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+    const shapes = [
+      [[0,0],[1,0],[-1,0],[2,0]], [[0,0],[1,0],[0,1],[1,1]],
+      [[0,0],[-1,0],[1,0],[1,1]], [[0,0],[-1,0],[1,0],[-1,1]],
+      [[0,0],[1,0],[0,1],[-1,1]], [[0,0],[-1,0],[0,1],[1,1]],
+      [[0,0],[-1,0],[1,0],[0,1]]
+    ];
+    const slimeColors = [0x75e68b,0x80d9ee,0xc78cff,0xffd66e,0xff8aa0,0x9eea73,0xffa56d];
+    let scene, camera, renderer, raycaster, pointer, active, activeGroup, lastTime;
+    let fallClock = 0, score = 0, lines = 0, level = 1, paused = false, gameOver = false;
+    const boardGroup = new THREE.Group();
+    const mats = new Map();
+    const $ = id => document.getElementById(id);
+
+    init(); reset(); requestAnimationFrame(frame);
+
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.OrthographicCamera(-7,7,12,-12,0.1,100);
+      camera.position.set(0,10,23); camera.lookAt(0,10,0);
+      renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+      renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace; $('game').prepend(renderer.domElement);
+      raycaster = new THREE.Raycaster(); pointer = new THREE.Vector2();
+      scene.add(new THREE.HemisphereLight(0xd8ffe0,0x10232b,2.2));
+      const sun = new THREE.DirectionalLight(0xfff4d2,3); sun.position.set(-4,13,10); scene.add(sun);
+      scene.add(boardGroup);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(COLS*CELL+.35,ROWS*CELL+.35,.35),new THREE.MeshStandardMaterial({color:0x123934,roughness:.9}));
+      back.position.set(0,10,-.8); scene.add(back);
+      const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(COLS*CELL+.35,ROWS*CELL+.35,.5)),new THREE.LineBasicMaterial({color:0xa5dc91,transparent:true,opacity:.38}));
+      frame.position.set(0,10,-.55); scene.add(frame);
+      for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) {
+        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(cellX(x)-CELL/2,cellY(y)-CELL/2,-.38),new THREE.Vector3(cellX(x)+CELL/2,cellY(y)-CELL/2,-.38)]),new THREE.LineBasicMaterial({color:0xb5e4a0,transparent:true,opacity:.07}));
+        scene.add(line);
+      }
+      addEventListener('resize', resize); renderer.domElement.addEventListener('pointerdown', clickBoard);
+      addEventListener('keydown', keydown);
+      $('restart').onclick = reset; $('pause').onclick = togglePause;
+    }
+    function cellX(x) { return (x-(COLS-1)/2)*CELL; }
+    function cellY(y) { return y*CELL + CELL/2; }
+    function resize() { const aspect=innerWidth/innerHeight, h=22; camera.top=h/2; camera.bottom=-h/2; camera.left=-h*aspect/2; camera.right=h*aspect/2; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); }
+    function reset() {
+      for(const row of board) for(let x=0;x<COLS;x++) if(row[x]) { boardGroup.remove(row[x].mesh); row[x]=null; }
+      if(activeGroup) scene.remove(activeGroup); score=0; lines=0; level=1; paused=false; gameOver=false; fallClock=0; hideMessage(); $('pause').textContent='一時停止'; updateStats(); spawn(); resize();
+    }
+    function spawn() {
+      const shape = shapes[Math.floor(Math.random()*shapes.length)].map(([x,y])=>({x,y}));
+      active={shape,x:Math.floor(COLS/2),y:ROWS-2,rot:0,color:slimeColors[Math.floor(Math.random()*slimeColors.length)]};
+      activeGroup = new THREE.Group(); scene.add(activeGroup); drawActive();
+      if(!valid(active.x,active.y,active.shape)) endGame();
+    }
+    function rotated(shape, turns) { let out=shape.map(p=>({...p})); for(let n=0;n<turns;n++) out=out.map(({x,y})=>({x:-y,y:x})); return out; }
+    function valid(px,py,shape) { return shape.every(p=>{const x=px+p.x,y=py+p.y; return x>=0&&x<COLS&&y>=0&&y<ROWS&&!board[y][x];}); }
+    function drawActive() {
+      activeGroup.clear(); const shape=rotated(active.shape,active.rot); const mat=material(active.color,false);
+      shape.forEach((p,i)=>{const mesh=slimeMesh(mat); mesh.position.set(cellX(active.x+p.x),cellY(active.y+p.y),.15); mesh.userData.active=true; mesh.userData.index=i; activeGroup.add(mesh);});
+    }
+    function slimeMesh(mat) { const mesh=new THREE.Mesh(new THREE.SphereGeometry(.46,18,12),mat); mesh.scale.set(1.08,.92,.82); const eyeMat=material(0x17362f,false); const eye=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),eyeMat); eye.position.set(-.16,.13,.39); mesh.add(eye); const eye2=eye.clone(); eye2.position.x=.16; mesh.add(eye2); return mesh; }
+    function material(color,sand) { const key=color+':'+sand; if(!mats.has(key)) mats.set(key,new THREE.MeshStandardMaterial({color:sand?0xc49a60:color,roughness:sand?.98:.42,metalness:0,emissive:sand?0x24170c:color,emissiveIntensity:sand?.05:.08})); return mats.get(key); }
+    function move(dx,dy) { if(gameOver||paused) return false; const shape=rotated(active.shape,active.rot); if(valid(active.x+dx,active.y+dy,shape)){active.x+=dx;active.y+=dy;drawActive();return true;} return false; }
+    function rotate() { if(gameOver||paused)return; const next=(active.rot+1)%4, shape=rotated(active.shape,next); if(valid(active.x,active.y,shape)||valid(active.x-1,active.y,shape)){ if(!valid(active.x,active.y,shape))active.x--; active.rot=next; drawActive(); } }
+    function lock(asSand=false) { const shape=rotated(active.shape,active.rot); shape.forEach(p=>{const x=active.x+p.x,y=active.y+p.y; const mesh=asSand?sandMesh(x,y):slimeMesh(material(active.color,false)); mesh.userData.cell={x,y}; mesh.position.set(cellX(x),cellY(y),.12); board[y][x]={mesh,type:asSand?'sand':'slime'}; boardGroup.add(mesh);}); scene.remove(activeGroup); activeGroup=null; active=null; clearLines(); spawn(); }
+    function sandMesh(x,y) { const mesh=new THREE.Mesh(new THREE.BoxGeometry(.88,.88,.65),material(0xc49a60,true)); mesh.userData.cell={x,y}; return mesh; }
+    function clearLines() { const full=[]; for(let y=0;y<ROWS;y++) if(board[y].every(c=>c&&c.type==='sand')) full.push(y); if(!full.length)return; full.forEach(y=>{for(let x=0;x<COLS;x++){boardGroup.remove(board[y][x].mesh);board[y][x]=null;}}); for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(board[y][x]) { const drop=full.filter(row=>row>y).length; board[y][x].mesh.position.y=cellY(y-drop); board[y-drop][x]=board[y][x]; if(drop)board[y][x]=null; } lines+=full.length; score+=([0,100,300,500,800][full.length]||1000)*level; level=1+Math.floor(lines/10); updateStats(); }
+    function clickBoard(event) { if(gameOver||paused)return; const rect=renderer.domElement.getBoundingClientRect(); pointer.x=((event.clientX-rect.left)/rect.width)*2-1; pointer.y=-((event.clientY-rect.top)/rect.height)*2+1; raycaster.setFromCamera(pointer,camera); const hits=raycaster.intersectObjects([activeGroup,...boardGroup.children].filter(Boolean),true); const hit=hits[0]; if(!hit)return; let obj=hit.object; while(obj&&obj.parent&&obj.parent!==boardGroup&&obj.parent!==activeGroup)obj=obj.parent; if(obj.userData.active){ lock(true); return; } const cell=obj.userData.cell; if(cell&&board[cell.y]?.[cell.x]?.type==='slime'){ const old=board[cell.y][cell.x]; board[cell.y][cell.x]={mesh:sandMesh(cell.x,cell.y),type:'sand'}; boardGroup.remove(old.mesh); boardGroup.add(board[cell.y][cell.x].mesh); clearLines(); updateStats(); } }
+    function hardDrop() { if(gameOver||paused)return; while(move(0,-1)){} lock(false); score+=5; updateStats(); }
+    function keydown(e) { if(e.code==='ArrowLeft'){e.preventDefault();move(-1,0)} else if(e.code==='ArrowRight'){e.preventDefault();move(1,0)} else if(e.code==='ArrowDown'){e.preventDefault();if(!move(0,-1))lock(false)} else if(e.code==='ArrowUp'){e.preventDefault();rotate()} else if(e.code==='Space'){e.preventDefault();hardDrop()} else if(e.code==='KeyP')togglePause(); else if(e.code==='KeyR')reset(); }
+    function togglePause(){if(gameOver)return;paused=!paused;$('pause').textContent=paused?'再開':'一時停止';if(paused)showMessage('PAUSED','再開ボタンまたは P キー');else hideMessage();}
+    function endGame(){gameOver=true;showMessage('GAME OVER','リスタートしてください');}
+    function showMessage(title,sub){$('messageText').firstChild.textContent=title;$('messageText').querySelector('small').textContent=sub;$('message').classList.add('on');}
+    function hideMessage(){$('message').classList.remove('on');}
+    function updateStats(){$('score').textContent=score.toLocaleString();$('lines').textContent=lines;$('level').textContent=level;}
+    function frame(now){const dt=Math.min((now-(lastTime||now))/1000,.1);lastTime=now;if(!paused&&!gameOver&&active){fallClock+=dt;const speed=Math.max(.12,.75-level*.055);if(fallClock>speed){fallClock=0;if(!move(0,-1))lock(false);}}renderer.render(scene,camera);requestAnimationFrame(frame);}
+  </script>
+</body>
+</html>
