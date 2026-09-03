@@ -84,10 +84,6 @@
       back.position.set(0,10,-.8); scene.add(back);
       const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(COLS*CELL+.35,ROWS*CELL+.35,.5)),new THREE.LineBasicMaterial({color:0xa5dc91,transparent:true,opacity:.38}));
       frame.position.set(0,10,-.55); scene.add(frame);
-      for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) {
-        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(cellX(x)-CELL/2,cellY(y)-CELL/2,-.38),new THREE.Vector3(cellX(x)+CELL/2,cellY(y)-CELL/2,-.38)]),new THREE.LineBasicMaterial({color:0xb5e4a0,transparent:true,opacity:.07}));
-        scene.add(line);
-      }
       addEventListener('resize', resize); renderer.domElement.addEventListener('pointerdown', clickBoard);
       addEventListener('keydown', keydown);
       $('restart').onclick = reset; $('pause').onclick = togglePause;
